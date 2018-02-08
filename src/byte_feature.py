@@ -75,18 +75,12 @@ class PreProcessor:
             byte_files += self.ctx.wholeTextFiles(str(byte_files_path)+str(hash)+'.bytes')
         return byte_files #(hash, byte file)
 
-    def write_to_file(self, trainData, labels):
-        resTrain = trainData.collect()
-        f2 = open('trainData_file', 'w')
+    def write_to_file(self, data, file_name):
+        resTrain = data.collect()
+        f2 = open(file_name, 'w')
         for i in range(len(resTrain)):
             f2.write(str(resTrain[i]) + '\n')
         f2.close()
-
-        resTest = labels.collect()
-        f3 = open('labels_file', 'w')
-        for i in range(len(resTest)):
-            f3.write(str(resTest[i]) + '\n')
-        f3.close()
 
     def transform_data(self, data, byte_files_path, labels=None):
         '''Loads the actual data, Extracts features out of it and maps labels with file names i.e. hash
