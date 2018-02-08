@@ -125,3 +125,18 @@ testData = byteTestFiles.map(lambda x: (prc.stripFileNames(x[0]), prc.tokenEachD
         .map(lambda x: (str(x[1][1]) + '-' + str(x[0]), sorted(x[1][0].iteritems(), key = lambda d:d[0])))\
         .map(lambda x: (x[0], prc.convertToSVMFormat(str(x[1]))))\
         .map(lambda x: prc.convertToSVMFormat2(str(x)))
+
+#write into a file
+resTrain = trainData.collect()
+f2 = open('trainDataTotal', 'w')
+for i in xrange(len(resTrain)):
+    f2.write(str(resTrain[i]) + '\n')
+f2.close()
+
+resTest = testData.collect()
+f3 = open('testDataTotal', 'w')
+for i in xrange(len(resTest)):
+    f3.write(str(resTest[i]) + '\n')
+f3.close()
+
+sc.stop()
