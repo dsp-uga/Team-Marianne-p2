@@ -1,6 +1,6 @@
 from pyspark import SparkContext, SparkConf
 import argparse
-import src.ByteFeature as src
+import src.byte_feature as src
 
 def preprocess(args):
     '''Test and verify the preprocessing
