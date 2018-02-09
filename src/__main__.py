@@ -13,21 +13,22 @@ def preprocess(args):
     byte_files_path = args.byte_files_path
 
     train_x, train_y = src.PreProcessor(sc).load_data(train_x, train_y)
-    transform_x, transform_y = src.PreProcessor(sc).transform_data(train_x, byte_files_path, train_y)
-    src.PreProcessor(sc).write_to_file(transform_x, transform_y)
+    training_data, training_labels = src.PreProcessor(sc).transform_data(train_x, byte_files_path, train_y)
+    # This is just an example of how to write the file with file name
+    src.PreProcessor(sc).write_to_file(training_data, 'training_data')
 
-    train_x, train_y = src.PreProcessor(sc).load_data(test_x, train_y)
-    transform_x, transform_y = src.PreProcessor(sc).transform_data(train_x, byte_files_path, train_y)
-    src.PreProcessor(sc).write_to_file(transform_x, transform_y)
+    test_x, test_y = src.PreProcessor(sc).load_data(test_x, test_y)
+    testing_data, testing_labels = src.PreProcessor(sc).transform_data(test_x, byte_files_path, test_y)
+    src.PreProcessor(sc).write_to_file(testing_data, 'testing_data')
 
-    print('transformed data is: ', transform_x.collectAsMap())
-    print('transformed label is: ', transform_y.collectAsMap())
+    print('transformed data is: ', training_data.collectAsMap())
+    print('transformed label is: ', training_labels.collectAsMap())
 
 def main():
     parser = argparse.ArgumentParser(description='Execute Commands')
     subcommands = parser.add_subparsers()
 
-    # src preprocess <train_x> <train_y> <test_x> [<test_y>]
+    # src preprocess <train_x> <train_y> <test_x> [<test_y>] <byte_files_path>
     cmd = subcommands.add_parser('preprocess', description= 'Preprocess')
     cmd.add_argument('train_x', help='path of the training data')
     cmd.add_argument('train_y', help='path of the training labels')
