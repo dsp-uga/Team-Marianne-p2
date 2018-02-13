@@ -7,8 +7,9 @@ def main(args):
 
 	# Refer https://spark.apache.org/docs/latest/configuration.html for additional changes to config
 	config = SparkConf().setAppName("team-marianne-p2")\
-				.set("spark.hadoop.validateOutputSpecs", "false")
-
+				.set("spark.hadoop.validateOutputSpecs", "false")\
+				.set('spark.driver.memory','12G')\
+				.set('spark.executor.memory','2G')
 	sc = SparkContext.getOrCreate(config)
 
 	data, labels = ByteFeatures(sc).load_data(args.dataset, args.labels)	# converts byte data and labels to RDDs
