@@ -5,7 +5,7 @@ from pyspark.mllib.tree import DecisionTree
 from sys import argv
 import numpy as np
 import re
-#import urllib2
+import urllib.request
 import csv
 from nltk.util import ngrams
 import itertools
@@ -67,16 +67,6 @@ class ByteFeatures:
             labels = None
         return data, labels
 
-    def extract_data(self, hash_list, byte_files_path):
-        '''Extracts byte files of hash number from the path provided and adds
-        all up in one single rdd
-        '''
-        byte_file = self.sc.wholeTextFiles(str(byte_files_path)+'/'+str(hash_list[0])+'.bytes')
-        for hash in hash_list[1:]:
-            new_byte_file = self.sc.wholeTextFiles(str(byte_files_path)+'/'+str(hash)+'.bytes')
-            byte_file = byte_file.union(new_byte_file)
-        return byte_file #(hash, byte file)
-
     def write_to_file(self, data, path):
         resTrain = data.collect()
         f = open(path, 'w')
@@ -92,14 +82,18 @@ class ByteFeatures:
             labels = labels.map(lambda x: (x[1][0], x[1][1])) # (hashm label)
         else:
             labels = None
-        #self.ngrams = self.sc.broadcast(self.grams)
-        hash_list = data.values().collect()
-        byte_files = self.extract_data(hash_list, byte_files_path)
 
-        def stripFileNames(stringOfName):
-            splits = stringOfName.split("/")
-            name = splits[-1][:20]
-            return name
+        def extract_data(byte_files_path, a):
+            '''Extracts byte files of hash number from the path provided
+            '''
+            if 'http' in byte_files_path:
+                with urllib.request.urlopen(byte_files_path+a+'.bytes') as url:
+                    byte_file = url.read().decode('utf-8')
+            else:
+                file = open(byte_files_path+'/'+a+'.bytes', 'rb')
+                byte_file = file.read().decode('utf-8')
+            return byte_file #(hash, byte file)
+        byte_files = data.map(lambda x:(x[1], extract_data(byte_files_path,x[1]))) #(hash, byte_file)
 
         def tokenEachDoc(aDoc):
             '''
@@ -120,7 +114,7 @@ class ByteFeatures:
                     #del sumGramDict[keys]
                     retDec[keys] = sumGramDict[keys]
             return retDec
-        data = byte_files.map(lambda x: (stripFileNames(x[0]), tokenEachDoc(x[1]))) # (hash, bigrams_dict)
+        data = byte_files.map(lambda x: (x[0], tokenEachDoc(x[1]))) # (hash, bigrams_dict)
 
         def convertHexToInt(hexStr):
             '''
