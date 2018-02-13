@@ -87,7 +87,7 @@ class ByteFeatures:
             '''Extracts byte files of hash number from the path provided
             '''
             if 'http' in byte_files_path:
-                with urllib.request.urlopen(byte_files_path+a+'.bytes') as url:
+                with urllib.request.urlopen(byte_files_path+'/'+a+'.bytes') as url:
                     byte_file = url.read().decode('utf-8')
             else:
                 file = open(byte_files_path+'/'+a+'.bytes', 'rb')
