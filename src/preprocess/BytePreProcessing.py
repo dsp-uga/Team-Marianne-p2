@@ -22,7 +22,7 @@ class ByteFeatures:
 
     def __init__(self, ctx,  grams=[1, 2], freqThreshold=10):
         self.grams = grams
-        self.freqThreshold = freqThreshold
+        self.freqThreshold = freqThreshold #frequency selected by 10
         self.sc = ctx
 
     def byteFeatureGenerator(self, X, y):  # format, (id, dictionary of items)
@@ -123,12 +123,12 @@ class ByteFeatures:
 
         def convertHexToInt(hexStr):
             '''
-            convert all hex number to 1-65792, which is one by one.
+            convert all hex number to 1-65792(upper limit value), which is one by one.
             '''
             if len(hexStr) == 2:
                 return (int(str(hexStr), 16)+1)
             else:
-                return (int('1' + str(hexStr), 16)-65279)
+                return (int('1' + str(hexStr), 16)-65279) #
 
         def convertDict(textDict):
             tmp = {}
