@@ -4,8 +4,8 @@ from pyspark import SparkContext, SparkConf
 from src.preprocess.BytePreProcessing import ByteFeatures
 
 def main(args):
-	
-	# Refer https://spark.apache.org/docs/latest/configuration.html for additional changes to config 
+
+	# Refer https://spark.apache.org/docs/latest/configuration.html for additional changes to config
 	config = SparkConf().setAppName("team-marianne-p2")\
 				.set("spark.hadoop.validateOutputSpecs", "false")
 

@@ -71,10 +71,11 @@ class ByteFeatures:
         '''Extracts byte files of hash number from the path provided and adds
         all up in one single rdd
         '''
-        byte_files = self.sc.wholeTextFiles(str(byte_files_path)+str(hash_list[0])+'.bytes')
+        byte_file = self.sc.wholeTextFiles(str(byte_files_path)+'/'+str(hash_list[0])+'.bytes')
         for hash in hash_list[1:]:
-            byte_files += self.sc.wholeTextFiles(str(byte_files_path)+str(hash)+'.bytes')
-        return byte_files #(hash, byte file)
+            new_byte_file = self.sc.wholeTextFiles(str(byte_files_path)+'/'+str(hash)+'.bytes')
+            byte_file = byte_file.union(new_byte_file)
+        return byte_file #(hash, byte file)
 
     def write_to_file(self, data, path):
         resTrain = data.collect()
