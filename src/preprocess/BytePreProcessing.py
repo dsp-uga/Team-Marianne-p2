@@ -71,6 +71,7 @@ class ByteFeatures:
             s = re.sub("\(","",s)
             f.write(s + '\n')
         f.close()
+        return path
 
     def transform_data(self, data, byte_files_path, labels=None):
         '''Loads the actual data, Extracts features out of it and maps labels with file names i.e. hash

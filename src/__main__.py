@@ -20,16 +20,16 @@ def random_forest_classification(sc, args, train_data, train_labels, test_data, 
 		return Str
 	y = x.mapValues(lambda x: convertToSVMFormat(str(x)))
 	# Writes the train_data rdd to path provided in args.bytesrdd
-	ByteFeatures(sc).write_to_file(y, args.bytesrdd)
-	train_data = MLUtils.loadLibSVMFile(sc, args.bytesrdd)
+	path_train = ByteFeatures(sc).write_to_file(y, args.bytesrdd)
+	train_data = MLUtils.loadLibSVMFile(sc, path_train)
 	# Converts the training data and labels into svm format
 	test_data = test_data.join(test_labels)\
 	     .map(lambda x: (x[1][1], sorted(x[1][0].items(), key = lambda d:d[0])))\
          .mapValues(lambda x: convertToSVMFormat(str(x)))\
 
 	# Writes the test_data rdd to path provided in args.bytesrddTest
-	ByteFeatures(sc).write_to_file(test_data, args.bytesrddTest)
-	test_data = MLUtils.loadLibSVMFile(sc, args.bytesrddTest)
+	path_test = ByteFeatures(sc).write_to_file(test_data, args.bytesrddTest)
+	test_data = MLUtils.loadLibSVMFile(sc, path_test)
 
 	model = RandomForest.trainClassifier(train_data, numClasses=9, categoricalFeaturesInfo={},\
                                      numTrees=3, featureSubsetStrategy="auto",\
@@ -38,8 +38,9 @@ def random_forest_classification(sc, args, train_data, train_labels, test_data, 
 	predictions = model.predict(test_data.map(lambda x: x.features))
 	print('predictions are----------',predictions.collect())
 	labelsAndPredictions = test_data.map(lambda x: x.label).zip(predictions)
-	testErr = labelsAndPredictions.filter(lambda lp: lp[0] != lp[1]).count() / float(test_data.count())
-	print('Test Error = ' + str(testErr))
+	print('labelsAndPredictions are----------',labelsAndPredictions.collect())
+	testErr = labelsAndPredictions.filter(lambda lp: lp[0] == lp[1]).count() / float(test_data.count())
+	print('Accuracy = ' + str(testErr))
 	print('Learned classification forest model:')
 	print(model.toDebugString())
 
