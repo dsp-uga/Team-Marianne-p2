@@ -4,6 +4,7 @@ from src.preprocess.BytePreProcessing import ByteFeatures
 from pyspark.mllib.tree import RandomForest, RandomForestModel
 from pyspark.mllib.util import MLUtils
 from pyspark.mllib.linalg import Vectors, SparseVector, _convert_to_vector
+import numpy as np
 import re
 
 def loadLibSVMFile(sc, data, numFeatures=-1, minPartitions=None, multiclass=None):
@@ -12,7 +13,23 @@ def loadLibSVMFile(sc, data, numFeatures=-1, minPartitions=None, multiclass=None
 		warnings.warn("deprecated", DeprecationWarning)
 
 	lines = data
-	parsed = lines.map(lambda l: MLUtils._parse_libsvm_line(l))
+	def _parse_libsvm_line(line, multiclass=None):
+		"""
+		Parses a line in LIBSVM format into (label, indices, values).
+		"""
+		if multiclass is not None:
+			warnings.warn("deprecated", DeprecationWarning)
+		items = line.split(None)
+		label = float(items[0])-1
+		nnz = len(items) - 1
+		indices = np.zeros(nnz, dtype=np.int32)
+		values = np.zeros(nnz)
+		for i in range(nnz):
+			index, value = items[1 + i].split(":")
+			indices[i] = int(index) - 1
+			values[i] = float(value)
+		return label, indices, values
+	parsed = lines.map(lambda l: _parse_libsvm_line(l))
 	if numFeatures <= 0:
 		parsed.cache()
 		numFeatures = parsed.map(lambda x: -1 if x[1].size == 0 else x[1][-1]).reduce(max) + 1
@@ -57,7 +74,7 @@ def random_forest_classification(sc, args, train_data, train_labels, test_data, 
 	test_data = loadLibSVMFile(sc, test_data.values())
 
 	model = RandomForest.trainClassifier(train_data, numClasses=9, categoricalFeaturesInfo={},\
-                                     numTrees=3, featureSubsetStrategy="auto",\
+                                     numTrees=9, featureSubsetStrategy="auto",\
                                      impurity='gini', maxDepth=4, maxBins=32)\
 
 	predictions = model.predict(test_data.map(lambda x: x.features))
