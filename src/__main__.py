@@ -78,6 +78,19 @@ def random_forest_classification(sc, args, train_data, train_labels, test_data, 
                                      impurity='gini', maxDepth=4, maxBins=32)\
 
 	predictions = model.predict(test_data.map(lambda x: x.features))
+	if(args.evaluate):
+		score(predictions,test_data)
+	write_output(predictions, args.output)
+
+def write_output(predictions, path):
+	resTrain = predictions.collect()
+	f = open(path, 'w')
+	for i in range(len(resTrain)):
+		f.write(str(resTrain[i]+1) + '\n')
+	f.close()
+	return path
+
+def score(predictions,test_data):
 	#print('predictions are----------',predictions.collect())
 	labelsAndPredictions = test_data.map(lambda x: x.label).zip(predictions)
 	#print('labelsAndPredictions are----------',labelsAndPredictions.collect())
@@ -85,7 +98,6 @@ def random_forest_classification(sc, args, train_data, train_labels, test_data, 
 	print('Accuracy = ' + str(testErr))
 	print('Learned classification forest model:')
 	print(model.toDebugString())
-
 
 def main(args):
 

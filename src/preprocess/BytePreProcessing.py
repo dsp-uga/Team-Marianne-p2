@@ -72,7 +72,7 @@ class ByteFeatures:
             labels = data.join(labels) # (id, (hash, label))
             labels = labels.map(lambda x: (x[1][0], x[1][1])) # (hashm label)
         else:
-            labels = None
+            labels = data.map(lambda x: (x[1], '1'))
 
         def extract_data(byte_files_path, a):
             '''Extracts byte files of hash number from the path provided
