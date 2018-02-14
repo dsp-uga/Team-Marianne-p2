@@ -3,7 +3,20 @@ from pyspark import SparkContext, SparkConf
 from src.preprocess.BytePreProcessing import ByteFeatures
 from pyspark.mllib.tree import RandomForest, RandomForestModel
 from pyspark.mllib.util import MLUtils
+from pyspark.mllib.linalg import Vectors, SparseVector, _convert_to_vector
 import re
+
+def loadLibSVMFile(sc, data, numFeatures=-1, minPartitions=None, multiclass=None):
+	from pyspark.mllib.regression import LabeledPoint
+	if multiclass is not None:
+		warnings.warn("deprecated", DeprecationWarning)
+
+	lines = data
+	parsed = lines.map(lambda l: MLUtils._parse_libsvm_line(l))
+	if numFeatures <= 0:
+		parsed.cache()
+		numFeatures = parsed.map(lambda x: -1 if x[1].size == 0 else x[1][-1]).reduce(max) + 1
+	return parsed.map(lambda x: LabeledPoint(x[0], Vectors.sparse(numFeatures, x[1], x[2])))
 
 def random_forest_classification(sc, args, train_data, train_labels, test_data, test_labels):
 	# Converts the training data and labels into svm format
@@ -17,19 +30,31 @@ def random_forest_classification(sc, args, train_data, train_labels, test_data, 
 		Str = re.sub("\, ", ":", Str)
 		Str = re.sub("\)\]", "", Str)
 		Str = re.sub("\[\(", "", Str)
-		return Str
-	y = x.mapValues(lambda x: convertToSVMFormat(str(x)))
+		s = re.sub("\(\'","",Str)
+		s = re.sub("\'\,","",s)
+		s = re.sub("\(\'","",s)
+		s = re.sub("\'\(","",s)
+		s = re.sub("\)\'\)","",s)
+		s = re.sub("\'","",s)
+		s = re.sub("\)","",s)
+		s = re.sub("\(","",s)
+		return s
+	y = x.mapValues(lambda x:convertToSVMFormat(str(x)))
+	y = y.map(lambda x:(x[0], x[0]+' '+x[1]))
 	# Writes the train_data rdd to path provided in args.bytesrdd
-	path_train = ByteFeatures(sc).write_to_file(y, args.bytesrdd)
-	train_data = MLUtils.loadLibSVMFile(sc, path_train)
-	# Converts the training data and labels into svm format
+	#path_train = ByteFeatures(sc).write_to_file(y, args.bytesrdd)
+	#train_data = MLUtils.loadLibSVMFile(sc, path_train)
+	train_data = loadLibSVMFile(sc, y.values())
+
+	# Converts the testing data and labels into svm format
 	test_data = test_data.join(test_labels)\
 	     .map(lambda x: (x[1][1], sorted(x[1][0].items(), key = lambda d:d[0])))\
          .mapValues(lambda x: convertToSVMFormat(str(x)))\
-
 	# Writes the test_data rdd to path provided in args.bytesrddTest
-	path_test = ByteFeatures(sc).write_to_file(test_data, args.bytesrddTest)
-	test_data = MLUtils.loadLibSVMFile(sc, path_test)
+	#path_test = ByteFeatures(sc).write_to_file(test_data, args.bytesrddTest)
+	#test_data = MLUtils.loadLibSVMFile(sc, path_test)
+	test_data = test_data.map(lambda x: (x[0], x[0]+' '+x[1]))
+	test_data = loadLibSVMFile(sc, test_data.values())
 
 	model = RandomForest.trainClassifier(train_data, numClasses=9, categoricalFeaturesInfo={},\
                                      numTrees=3, featureSubsetStrategy="auto",\

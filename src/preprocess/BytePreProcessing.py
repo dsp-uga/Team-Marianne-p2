@@ -61,15 +61,7 @@ class ByteFeatures:
         resTrain = data.collect()
         f = open(path, 'w')
         for i in range(len(resTrain)):
-            s = re.sub("\(\'","",str(resTrain[i]))
-            s = re.sub("\'\,","",s)
-            s = re.sub("\(\'","",s)
-            s = re.sub("\'\(","",s)
-            s = re.sub("\)\'\)","",s)
-            s = re.sub("\'","",s)
-            s = re.sub("\)","",s)
-            s = re.sub("\(","",s)
-            f.write(s + '\n')
+            f.write(str(resTrain[i]) + '\n')
         f.close()
         return path
 
