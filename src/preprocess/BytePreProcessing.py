@@ -35,16 +35,6 @@ class ByteFeatures:
 
         return tokenizedX
 
-    def convertToSVMFormat(self, Str):
-        '''
-        convert each line to the SVM format which can be loaded by MLUtils.loadLibSVMFile()
-        '''
-        newStr = re.sub("\), \(", " ", Str)
-        newStr = re.sub("\, ", ":", newStr)
-        newStr = re.sub("\)\]", "", newStr)
-        newStr = re.sub("\[\(", " ", newStr)
-        return newStr
-
     def convertToSVMFormat2(self, Str):
         '''
         prepare to combine the byte training/test files with asm training/test files.
@@ -71,7 +61,15 @@ class ByteFeatures:
         resTrain = data.collect()
         f = open(path, 'w')
         for i in range(len(resTrain)):
-            f.write(str(resTrain[i]) + '\n')
+            s = re.sub("\(\'","",str(resTrain[i]))
+            s = re.sub("\'\,","",s)
+            s = re.sub("\(\'","",s)
+            s = re.sub("\'\(","",s)
+            s = re.sub("\)\'\)","",s)
+            s = re.sub("\'","",s)
+            s = re.sub("\)","",s)
+            s = re.sub("\(","",s)
+            f.write(s + '\n')
         f.close()
 
     def transform_data(self, data, byte_files_path, labels=None):
