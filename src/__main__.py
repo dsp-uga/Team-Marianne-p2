@@ -78,9 +78,9 @@ def random_forest_classification(sc, args, train_data, train_labels, test_data, 
                                      impurity='gini', maxDepth=4, maxBins=32)\
 
 	predictions = model.predict(test_data.map(lambda x: x.features))
-	print('predictions are----------',predictions.collect())
+	#print('predictions are----------',predictions.collect())
 	labelsAndPredictions = test_data.map(lambda x: x.label).zip(predictions)
-	print('labelsAndPredictions are----------',labelsAndPredictions.collect())
+	#print('labelsAndPredictions are----------',labelsAndPredictions.collect())
 	testErr = labelsAndPredictions.filter(lambda lp: lp[0] == lp[1]).count() / float(test_data.count())
 	print('Accuracy = ' + str(testErr))
 	print('Learned classification forest model:')
