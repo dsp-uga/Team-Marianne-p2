@@ -86,7 +86,7 @@ def write_output(predictions, path):
 	resTrain = predictions.collect()
 	f = open(path, 'w')
 	for i in range(len(resTrain)):
-		f.write(str(resTrain[i]+1) + '\n')
+		f.write(str(int(resTrain[i]+1)) + '\n')
 	f.close()
 	return path
 
@@ -105,7 +105,13 @@ def main(args):
 	config = SparkConf().setAppName("team-marianne-p2")\
 				.set("spark.hadoop.validateOutputSpecs", "false")\
 				.set('spark.driver.memory','12G')\
-				.set('spark.executor.memory','2G')
+				.set('spark.executor.memory','12G')\
+				.set('spark.executor.cores','4')\
+				.set('spark.python.worker.memory','5G')\
+				.set('spark.driver.cores','4')\
+				.set('spark.yarn.executor.memoryOverhead','1024')\
+				.set('spark.yarn.driver.memoryOverhead','1024')
+
 	sc = SparkContext.getOrCreate(config)
 
 	train_data, train_labels = ByteFeatures(sc).load_data(args.dataset, args.labels)	# converts training byte data and labels to RDDs
