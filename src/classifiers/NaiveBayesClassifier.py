@@ -5,7 +5,6 @@ import numpy as np
 
 from src.preprocess.AsmPreProcessing import AsmFeatures
 import src.preprocess.preprocess as preprocess
-import src.preprocess.utils as utils
 
 class NaiveBayesClassifier(object):
 	"""
