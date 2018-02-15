@@ -5,7 +5,6 @@ import numpy as np
 
 from src.preprocess.BytePreProcessing import ByteFeatures
 import src.preprocess.preprocess as preprocess
-import src.preprocess.utils as utils
 
 class Bytes_NaiveBayesTrainer(object):
 	"""
