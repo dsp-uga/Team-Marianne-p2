@@ -4,8 +4,8 @@ Ankit Vaghela
 - Deployed project on Google Cloud Dataproc 
 
 Jin Wang
--
+
 Niraj Kadam
--
+
 Vinay Kumar
--
+
