@@ -17,7 +17,7 @@ parser.add_argument ("-t", "--testset", default="data/sample/X_vs_test.txt",
 parser.add_argument ("-e", "--evaluate", action="store_true",
     help = "Set this to evaluate accuracy on the test set")
 
-parser.add_argument ("-m", "--testlabels", default="data/sample/y_vs_test.txt",
+parser.add_argument ("-m", "--testlabels",
     help = "Path to text file containing labels of documents in testing set."
             "If evaluate is set true, this file is compared with classifier output")
 
@@ -39,8 +39,14 @@ parser.add_argument ("-A", "--asmrdd", default="data/sample/asm_rdd.txt",
 parser.add_argument ("-B", "--bytesrdd", default="data/sample/bytes_rdd.txt",
     help = "Path to text file in which RDD from bytes file is stored after preprocessing")
 
-parser.add_argument ("-o", "--output", default="output",
+parser.add_argument ("-C", "--bytesrddTest", default="data/sample/bytes_rdd_test.txt",
+    help = "Path to text file in which RDD from bytes file is stored after preprocessing for test")
+
+parser.add_argument ("-o", "--output", default="data/sample/output.txt",
     help = "Path to the directory where output will be written")
+
+parser.add_argument ("-model", "--mlModel", default="svm",
+    help = "Specifies which ML model is to be used")
 
 args = parser.parse_args()
 

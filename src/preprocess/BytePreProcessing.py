@@ -10,6 +10,8 @@ import csv
 from nltk.util import ngrams
 import itertools
 from collections import Counter
+from pyspark.mllib.util import MLUtils
+from pyspark.mllib.linalg import Vectors, SparseVector, _convert_to_vector
 
 class ByteFeatures:
     '''
@@ -19,11 +21,78 @@ class ByteFeatures:
         - X: pyspark rdd, with (id, rawDoc) format
         - y: pyspark rdd, with (id, label) format
     '''
-
     def __init__(self, ctx,  grams=[1, 2], freqThreshold=10):
         self.grams = grams
         self.freqThreshold = freqThreshold #frequency selected by 10
         self.sc = ctx
+
+    def loadLibSVMFile(self, sc, data, numFeatures=-1, minPartitions=None, multiclass=None):
+    	'''This is function used to load a file and convert it in LabeledPoint RDD
+    	   I tweaked this method to directly process my RDD.
+    	   refer to : https://spark.apache.org/docs/1.6.3/api/python/_modules/pyspark/mllib/util.html for details
+    	'''
+    	from pyspark.mllib.regression import LabeledPoint
+    	if multiclass is not None:
+    		warnings.warn("deprecated", DeprecationWarning)
+
+    	lines = data
+    	def _parse_libsvm_line(line, multiclass=None):
+    		"""
+    		Parses a line in LIBSVM format into (label, indices, values).
+    		This method was tweaked so that labels of my training set can be set
+    		to be from 0 to 8 instead of default 1 to 9.
+    		refer to : https://spark.apache.org/docs/1.6.3/api/python/_modules/pyspark/mllib/util.html for details
+    		"""
+    		if multiclass is not None:
+    			warnings.warn("deprecated", DeprecationWarning)
+    		items = line.split(None)
+    		label = float(items[0])-1
+    		nnz = len(items) - 1
+    		indices = np.zeros(nnz, dtype=np.int32)
+    		values = np.zeros(nnz)
+    		for i in range(nnz):
+    			index, value = items[1 + i].split(":")
+    			indices[i] = int(index) - 1
+    			values[i] = float(value)
+    		return label, indices, values
+    	parsed = lines.map(lambda l: _parse_libsvm_line(l))
+    	if numFeatures <= 0:
+    		parsed.cache()
+    		numFeatures = parsed.map(lambda x: -1 if x[1].size == 0 else x[1][-1]).reduce(max) + 1
+    	return parsed.map(lambda x: LabeledPoint(x[0], Vectors.sparse(numFeatures, x[1], x[2])))
+
+    def convert_svmlib(self, sc, args, train_data, train_labels, test_data, test_labels):
+        '''This prepares and converts the training and testing data to svmlib format
+        '''
+        def convertToSVMFormat(Str):
+            '''convert each line to the SVM format which can be loaded by MLUtils.loadLibSVMFile()
+            '''
+            Str = re.sub("\)\, \(", " ", Str)
+            Str = re.sub("\, ", ":", Str)
+            Str = re.sub("\)\]", "", Str)
+            Str = re.sub("\[\(", "", Str)
+            s = re.sub("\(\'","",Str)
+            s = re.sub("\'\,","",s)
+            s = re.sub("\(\'","",s)
+            s = re.sub("\'\(","",s)
+            s = re.sub("\)\'\)","",s)
+            s = re.sub("\'","",s)
+            s = re.sub("\)","",s)
+            s = re.sub("\(","",s)
+            return s
+        #Convert train data to svmlib file format
+        train_data = train_data.join(train_labels)\
+    	     .map(lambda x: (x[1][1], sorted(x[1][0].items(), key = lambda d:d[0])))\
+             .mapValues(lambda x: convertToSVMFormat(str(x)))\
+    		 .map(lambda x:(x[0], x[0]+' '+x[1]))
+        train_data = ByteFeatures(sc).loadLibSVMFile(sc, train_data.values())
+    	# Convert test data to svmlib format
+        test_data = test_data.join(test_labels)\
+    	     .map(lambda x: (x[1][1], sorted(x[1][0].items(), key = lambda d:d[0])))\
+             .mapValues(lambda x: convertToSVMFormat(str(x)))\
+    		 .map(lambda x: (x[0], x[0]+' '+x[1]))
+        test_data = ByteFeatures(sc).loadLibSVMFile(sc, test_data.values())
+        return train_data, test_data
 
     def byteFeatureGenerator(self, X, y):  # format, (id, dictionary of items)
         '''
@@ -34,16 +103,6 @@ class ByteFeatures:
             .join(y)
 
         return tokenizedX
-
-    def convertToSVMFormat(self, Str):
-        '''
-        convert each line to the SVM format which can be loaded by MLUtils.loadLibSVMFile()
-        '''
-        newStr = re.sub("\), \(", " ", Str)
-        newStr = re.sub("\, ", ":", newStr)
-        newStr = re.sub("\)\]", "", newStr)
-        newStr = re.sub("\[\(", " ", newStr)
-        return newStr
 
     def convertToSVMFormat2(self, Str):
         '''
@@ -68,11 +127,15 @@ class ByteFeatures:
         return data, labels
 
     def write_to_file(self, data, path):
+        '''Writes the rdd given in data to the path specified in Path.
+           Purely for development purposes
+        '''
         resTrain = data.collect()
         f = open(path, 'w')
         for i in range(len(resTrain)):
             f.write(str(resTrain[i]) + '\n')
         f.close()
+        return path
 
     def transform_data(self, data, byte_files_path, labels=None):
         '''Loads the actual data, Extracts features out of it and maps labels with file names i.e. hash
@@ -81,7 +144,7 @@ class ByteFeatures:
             labels = data.join(labels) # (id, (hash, label))
             labels = labels.map(lambda x: (x[1][0], x[1][1])) # (hashm label)
         else:
-            labels = None
+            labels = data.map(lambda x: (x[1], '1'))
 
         def extract_data(byte_files_path, a):
             '''Extracts byte files of hash number from the path provided
