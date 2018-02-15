@@ -3,6 +3,9 @@ Ankit Vaghela
 - Implemented Spark MLLIB's Naive Bayes, SVM, Random Forest and Logistic Regression
 - Deployed project on Google Cloud Dataproc 
 
-Jin Wang,
-Niraj Kadam,
+Jin Wang
+-
+Niraj Kadam
+-
 Vinay Kumar
+-
