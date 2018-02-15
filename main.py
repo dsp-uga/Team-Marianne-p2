@@ -45,7 +45,7 @@ parser.add_argument ("-C", "--bytesrddTest", default="data/sample/bytes_rdd_test
 parser.add_argument ("-o", "--output", default="data/sample/output.txt",
     help = "Path to the directory where output will be written")
 
-parser.add_argument ("-model", "--mlModel", default="lr",
+parser.add_argument ("-model", "--mlModel", default="svm",
     help = "Specifies which ML model is to be used")
 
 args = parser.parse_args()
