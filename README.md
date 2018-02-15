@@ -26,7 +26,8 @@ Very simple pipe line for this project can be described as below:
 4. After converting the data to svmlib format, it is inputted to any of the Machine learning model specified in `<args>` (Refer to [2]).
 
 ## References
-[1] https://spark.apache.org/docs/1.6.3/api/python/_modules/pyspark/mllib/util.html
+[1] https://spark.apache.org/docs/1.6.3/api/python/_modules/pyspark/mllib/util.html 
+
 [2] https://spark.apache.org/docs/2.2.0/mllib-guide.html#mllib-rdd-based-api
 
   
