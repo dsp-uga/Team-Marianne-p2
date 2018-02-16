@@ -47,6 +47,7 @@ class SparkDFMl:
         string_indexer = StringIndexer(inputCol='label', outputCol='label_numeric')
         rescaled_data_numeric = string_indexer.fit(rescaled_data).transform(rescaled_data)
         ret_df = rescaled_data_numeric.selectExpr('id as id', 'label_numeric as label', 'features as features')
+        ret_df_f = ret_df.select(id, (label-1), features)
         #print('tf columns are-- ',tf.columns)
         #print('rescaled_data columns are-- ',rescaled_data.columns)
         #print('Joined columns are-- ',tf.join(rescaled_data, ['id']).columns)
@@ -280,7 +281,7 @@ class ByteFeatures:
             for oldKey, value in textDict.items():
                 tmp[convertHexToInt(oldKey)] = value
             return tmp
-        #data = data.map(lambda x: (x[0], convertDict(x[1]))) # (hash, bigrams_dict)-- bigram_dict's key is integer now
+        data = data.map(lambda x: (x[0], convertDict(x[1]))) # (hash, bigrams_dict)-- bigram_dict's key is integer now
         return data, labels
 
 def loadLibSVMFile(sc, data, numFeatures=-1, minPartitions=None, multiclass=None):
