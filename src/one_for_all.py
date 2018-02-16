@@ -94,24 +94,27 @@ class ByteFeatures:
 
     	lines = data
     	def _parse_libsvm_line(line, multiclass=None):
-    		"""
-    		Parses a line in LIBSVM format into (label, indices, values).
-    		This method was tweaked so that labels of my training set can be set
-    		to be from 0 to 8 instead of default 1 to 9.
-    		refer to : https://spark.apache.org/docs/1.6.3/api/python/_modules/pyspark/mllib/util.html for details
-    		"""
-    		if multiclass is not None:
-    			warnings.warn("deprecated", DeprecationWarning)
-    		items = line.split(None)
-    		label = float(items[0])-1
-    		nnz = len(items) - 1
-    		indices = np.zeros(nnz, dtype=np.int32)
-    		values = np.zeros(nnz)
-    		for i in range(nnz):
-    			index, value = items[1 + i].split(":")
-    			indices[i] = int(index) - 1
-    			values[i] = float(value)
-    		return label, indices, values
+            """
+            Parses a line in LIBSVM format into (label, indices, values).
+            This method was tweaked so that labels of my training set can be set
+            to be from 0 to 8 instead of default 1 to 9.
+            refer to : https://spark.apache.org/docs/1.6.3/api/python/_modules/pyspark/mllib/util.html for details
+            """
+            if multiclass is not None:
+                warnings.warn("deprecated", DeprecationWarning)
+            items = line.split(None)
+            label = float(items[0])-1
+            nnz = len(items) - 1
+            indices = np.zeros(nnz, dtype=np.int32)
+            values = np.zeros(nnz)
+            for i in range(nnz):
+                if len(items[1 + i].split(":")) is 2:
+                    index, value = items[1 + i].split(":")
+                else:
+                    print('error is --- ', items[1 + i])
+                indices[i] = int(index) - 1
+                values[i] = float(value)
+            return label, indices, values
     	parsed = lines.map(lambda l: _parse_libsvm_line(l))
     	if numFeatures <= 0:
     		parsed.cache()
