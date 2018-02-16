@@ -1,6 +1,7 @@
 
 import argparse
 from pyspark import SparkContext, SparkConf
+from pyspark.sql import SQLContext
 from pyspark.mllib.tree import RandomForest, RandomForestModel
 from pyspark.mllib.classification import NaiveBayes, NaiveBayesModel, LogisticRegressionWithLBFGS, LogisticRegressionModel
 import re
@@ -17,6 +18,56 @@ from collections import Counter
 from pyspark.mllib.util import MLUtils
 from pyspark.mllib.linalg import Vectors, SparseVector
 from pyspark.mllib.feature import HashingTF, IDF
+from pyspark.ml.feature import HashingTF, IDF, Tokenizer, NGram, StringIndexer
+from pyspark.ml.classification import NaiveBayes
+from pyspark.ml.evaluation import MulticlassClassificationEvaluator
+from pyspark.sql.types import StructType, StructField, StringType
+
+class SparkDFMl:
+    '''This class provides functions to be used to implement ML models in dataframes
+    '''
+    def __init__(self, sc):
+        self.sc = sc
+
+    def featurize_data(sc, data):
+        # Tokenize the strings
+        tokenizer = Tokenizer(inputCol='feature', outputCol='feature_tokens')
+        tokenized_train_df = tokenizer.transform(data)
+        #tokenized_train_df.show()
+        # Extract bigrams out of strings
+        ngram = NGram(n=2, inputCol='feature_tokens', outputCol='ngrams')
+        bigram_train_df = ngram.transform(tokenized_train_df)
+        # Converting to hashing features
+        hashing_tf = HashingTF(inputCol='ngrams', outputCol='rawFeatures')
+        tf = hashing_tf.transform(bigram_train_df)
+        # Converting to counts to TFIDF
+        idf = IDF(inputCol='rawFeatures', outputCol='features')
+        idf_model = idf.fit(tf)
+        rescaled_data = idf_model.transform(tf)
+        string_indexer = StringIndexer(inputCol='label', outputCol='label_numeric')
+        rescaled_data_numeric = string_indexer.fit(rescaled_data).transform(rescaled_data)
+        ret_df = rescaled_data_numeric.selectExpr('id as id', 'label_numeric as label', 'features as features')
+        #print('tf columns are-- ',tf.columns)
+        #print('rescaled_data columns are-- ',rescaled_data.columns)
+        #print('Joined columns are-- ',tf.join(rescaled_data, ['id']).columns)
+        #tf.show()
+        #rescaled_data.show()
+        #tfidf = tf.join(rescaled_data, ['id', 'label']).select('id', 'label', (tf.rawFeatures*rescaled_data.features_idf).alias('feature'))
+        return ret_df
+
+    def naive_bayes(sc, train_df, test_df):
+        '''This is implementation of Naive Bayes Algorithm using dataframes
+        '''
+        train_data = SparkDFMl(sc).featurize_data(train_df)
+        test_data = SparkDFMl(sc).featurize_data(test_df)
+        nb = NaiveBayes(smoothing=1.0, modelType='multinomial')
+        nb_model = nb.fit(train_data)
+        predictions = nb_model.transform(test_data)
+        predictions.show()
+
+        evaluator = MulticlassClassificationEvaluator(labelCol='label', predictionCol='prediction', metricName='accuracy')
+        accuracy = evaluator.evaluate(prediction)
+        print('Accuracy is---' + str(accuracy))
 
 class ByteFeatures:
     '''
@@ -65,6 +116,16 @@ class ByteFeatures:
     		parsed.cache()
     		numFeatures = parsed.map(lambda x: -1 if x[1].size == 0 else x[1][-1]).reduce(max) + 1
     	return parsed.map(lambda x: LabeledPoint(x[0], Vectors.sparse(numFeatures, x[1], x[2])))
+
+    def convert_to_dataframe(self, sql_context, data, labels):
+        data_rdd = data.join(labels) \
+        .map(lambda x: (x[0], x[1][0], x[1][1])) # (hashid, feature, label)
+        # Creating id, feature, label schema
+        schema = StructType([StructField('id', StringType(), True),\
+        StructField('feature', StringType(), True),\
+        StructField('label', StringType(), True)])
+        data = sql_context.createDataFrame(data_rdd, schema)
+        return data
 
     def convert_svmlib(self, sc, args, train_data, train_labels, test_data, test_labels):
         '''This prepares and converts the training and testing data to svmlib format
@@ -142,12 +203,20 @@ class ByteFeatures:
         f.close()
         return path
 
+    def extract_data_in_rdd(self, hashIds, byte_files_path):
+        def make_urls(hash_id):
+            return byte_files_path+'/'+hash_id+'.bytes'
+        hashURLs = hashIds.map(lambda x:make_urls(x))
+        hashURLs = hashURLs.reduce(lambda x, y: x+','+y)
+        print('hashURLs are -----', hashURLs)
+        return self.sc.wholeTextFiles(hashURLs)
+
     def transform_data(self, data, byte_files_path, labels=None):
         '''Loads the actual data, Extracts features out of it and maps labels with file names i.e. hash
         '''
         if labels is not None:
             labels = data.join(labels) # (id, (hash, label))
-            labels = labels.map(lambda x: (x[1][0], x[1][1])) # (hashm label)
+            labels = labels.map(lambda x: (x[1][0], x[1][1])) # (hashid, label)
         else:
             labels = data.map(lambda x: (x[1], '1'))
 
@@ -161,8 +230,13 @@ class ByteFeatures:
                 file = open(byte_files_path+'/'+a+'.bytes', 'rb')
                 byte_file = file.read().decode('utf-8')
             return byte_file #(hash, byte file)
-        byte_files = data.map(lambda x:(x[1], extract_data(byte_files_path,x[1]))) #(hash, byte_file)
-        print('---------------------------http files downloaded---------------------------------------')
+        #byte_files = data.map(lambda x:(x[1], extract_data(byte_files_path,x[1]))) #(hashid, byte_file)
+        def stripFileNames(stringOfName):
+            splits = stringOfName.split("/")
+            name = splits[-1][:20]
+            return name
+        byte_files = ByteFeatures(self.sc).extract_data_in_rdd (data.values(), byte_files_path)
+        byte_files = byte_files.map(lambda x: (stripFileNames(x[0]), x[1]))
 
         def tokenEachDoc(aDoc):
             '''
@@ -182,10 +256,15 @@ class ByteFeatures:
                 if sumGramDict[keys] < 10:
                     #del sumGramDict[keys]
                     retDec[keys] = sumGramDict[keys]
-            #print('sample is------------',retDec)
-            #print(1/0)
             return retDec
-        data = byte_files.map(lambda x: (x[0], tokenEachDoc(x[1]))) # (hash, bigrams_dict)
+        #data = byte_files.map(lambda x: (x[0], tokenEachDoc(x[1]))) # (hash, bigrams_dict)
+        def convert_to_feature(doc):
+            '''Convert the byte file to feature
+            '''
+            tmpWordList = [x for x in re.sub('\\\\r\\\\n', ' ', doc).split() if len(x) == 2 and x != '??' and x!='00']
+            s= ''.join(str(f)+' ' for f in tmpWordList)
+            return s
+        data = byte_files.mapValues(lambda x: convert_to_feature(x)) # (hash, bigrams_dict)
 
         def convertHexToInt(hexStr):
             '''
@@ -201,7 +280,7 @@ class ByteFeatures:
             for oldKey, value in textDict.items():
                 tmp[convertHexToInt(oldKey)] = value
             return tmp
-        data = data.map(lambda x: (x[0], convertDict(x[1]))) # (hash, bigrams_dict)-- bigram_dict's key is integer now
+        #data = data.map(lambda x: (x[0], convertDict(x[1]))) # (hash, bigrams_dict)-- bigram_dict's key is integer now
         return data, labels
 
 def loadLibSVMFile(sc, data, numFeatures=-1, minPartitions=None, multiclass=None):
@@ -239,105 +318,108 @@ def loadLibSVMFile(sc, data, numFeatures=-1, minPartitions=None, multiclass=None
 		numFeatures = parsed.map(lambda x: -1 if x[1].size == 0 else x[1][-1]).reduce(max) + 1
 	return parsed.map(lambda x: LabeledPoint(x[0], Vectors.sparse(numFeatures, x[1], x[2])))
 
-def random_forest_classification(sc, args, train_data, test_data):
-    '''This does the Random forest classification for given train and test set
+class SparkRDDMl:
+    ''' This class provides functions to be used to implement ML models in rdds
     '''
-    # Create model and make prediction
-    model = RandomForest.trainClassifier(train_data, numClasses=9, categoricalFeaturesInfo={},\
-                                     numTrees=9, featureSubsetStrategy="auto",\
-                                     impurity='gini', maxDepth=4, maxBins=32)
-    predictions = model.predict(test_data.map(lambda x: x.features))
-    predictions.saveAsTextFile('output.txt')
-    predictions_f = predictions.collect()
-    print('---------------------printing output----------------------------------')
-    for i in range(len(predictions_f)):
-        print(str(int(predictions_f[i]+1)))
-    print('---------------------printing output----------------------------------')
-    if(args.evaluate):
-        score(predictions,test_data, model, args.mlModel)
-    #write_output(predictions, args.output)
+    def __init__(self, sc) :
+        self.sc = sc
 
-def naive_bayes_mllib(sc, args, train_data, test_data):
-	'''This does the Naive Bayes Classification for given train and test set
-	'''
-	# Create model and make predictions
-	model = NaiveBayes.train(train_data, 1.0)
-	predictions = model.predict(test_data.map(lambda x: x.features))
-	if(args.evaluate):
-		score(predictions,test_data, model, args.mlModel)
-	write_output(predictions, args.output)
+    def random_forest_classification(self, sc, args, train_data, test_data):
+    	'''This does the Random forest classification for given train and test set
+    	'''
+    	# Create model and make prediction
+    	model = RandomForest.trainClassifier(train_data, numClasses=9, categoricalFeaturesInfo={},\
+                                         numTrees=9, featureSubsetStrategy="auto",\
+                                         impurity='gini', maxDepth=4, maxBins=32)
+    	predictions = model.predict(test_data.map(lambda x: x.features))
+    	if(args.evaluate):
+    		score(predictions,test_data, model, args.mlModel)
+    	write_output(predictions, args.output)
 
-def logistic_regression_classification(sc, args, train_data, test_data):
-	'''This does the logistic regression classification for given train and test set
-	'''
-	# create model and make prediction
-	model = LogisticRegressionWithLBFGS.train(train_data, iterations=100, numClasses=9)
-	predictions = model.predict(test_data.map(lambda x: x.features))
-	if(args.evaluate):
-		score(predictions,test_data, model, args.mlModel)
-	write_output(predictions, args.output)
+    def naive_bayes_mllib(self, sc, args, train_data, test_data):
+    	'''This does the Naive Bayes Classification for given train and test set
+    	'''
+    	# Create model and make predictions
+    	model = NaiveBayes.train(train_data, 1.0)
+    	predictions = model.predict(test_data.map(lambda x: x.features))
+    	if(args.evaluate):
+    		score(predictions,test_data, model, args.mlModel)
+    	write_output(predictions, args.output)
 
-def svm_classification(sc, args, train_data, test_data):
-	'''This does the svm classification for given train and test set
-	'''
-	# create model and make prediction
-	model = SVMWithSGD.train(train_data, iterations=100, numClasses=9)
-	predictions = model.predict(test_data.map(lambda x: x.features))
-	if(args.evaluate):
-		score(predictions,test_data, model, args.mlModel)
-	write_output(predictions, args.output)
+    def logistic_regression_classification(self, sc, args, train_data, test_data):
+    	'''This does the logistic regression classification for given train and test set
+    	'''
+    	# create model and make prediction
+    	model = LogisticRegressionWithLBFGS.train(train_data, iterations=100, numClasses=9)
+    	predictions = model.predict(test_data.map(lambda x: x.features))
+    	if(args.evaluate):
+    		score(predictions,test_data, model, args.mlModel)
+    	write_output(predictions, args.output)
 
-def write_output(predictions, path):
-	'''Write the output to file given in the args output path
-	'''
-	resTrain = predictions.collect()
-	f = open(path, 'w')
-	for i in range(len(resTrain)):
-		f.write(str(int(resTrain[i]+1)) + '\n')
-	f.close()
-	return path
+    def svm_classification(self, sc, args, train_data, test_data):
+    	'''This does the svm classification for given train and test set
+    	'''
+    	# create model and make prediction
+    	model = SVMWithSGD.train(train_data, iterations=100, numClasses=9)
+    	predictions = model.predict(test_data.map(lambda x: x.features))
+    	if(args.evaluate):
+    		score(predictions,test_data, model, args.mlModel)
+    	write_output(predictions, args.output)
 
-def score(predictions,test_data, model, mlModel):
-	'''Prints out the accuracy
-	'''
-	print('score called')
-	labelsAndPredictions = test_data.map(lambda x: x.label).zip(predictions)
-	testErr = labelsAndPredictions.filter(lambda lp: lp[0] == lp[1]).count() / float(test_data.count())
-	print('For '+mlModel+' Accuracy = ' + str(testErr))
+    def write_output(predictions, path):
+    	'''Write the output to file given in the args output path
+    	'''
+    	resTrain = predictions.collect()
+    	f = open(path, 'w')
+    	for i in range(len(resTrain)):
+    		f.write(str(int(resTrain[i]+1)) + '\n')
+    	f.close()
+    	return path
+
+    def score(predictions,test_data, model, mlModel):
+    	'''Prints out the accuracy accuracy
+    	'''
+    	print('score called')
+    	labelsAndPredictions = test_data.map(lambda x: x.label).zip(predictions)
+    	testErr = labelsAndPredictions.filter(lambda lp: lp[0] == lp[1]).count() / float(test_data.count())
+    	print('For '+mlModel+' Accuracy = ' + str(testErr))
 
 def main(args):
 	# Refer https://spark.apache.org/docs/latest/configuration.html for additional changes to config
-    config = SparkConf().setAppName("team-marianne-p2")\
-				.set("spark.hadoop.validateOutputSpecs", "false")
+	config = SparkConf().setAppName("team-marianne-p2")\
+				.set("spark.hadoop.validateOutputSpecs", "false")\
 
-    sc = SparkContext.getOrCreate(config)
+	sc = SparkContext.getOrCreate(config)
+	sql_context = SQLContext(sc)
 	# Preprocess training data
-    train_data, train_labels = ByteFeatures(sc).load_data(args.dataset, args.labels)	# converts training byte data and labels to RDDs
-    print('---------------------------training data loaded---------------------------------------')
+	train_data, train_labels = ByteFeatures(sc).load_data(args.dataset, args.labels)	# converts training byte data and labels to RDDs
 	# training: updates data and labels rdds. labels will be updated to (hash, label) and data will be updated to (hash, bigram_dict)
-    train_data, train_labels = ByteFeatures(sc).transform_data(train_data, args.bytestrain, train_labels)
-    print('---------------------------training data transformed---------------------------------------')
+	train_data, train_labels = ByteFeatures(sc).transform_data(train_data, args.bytestrain, train_labels)
 	# Preprocdess testing data
-    test_data, test_labels = ByteFeatures(sc).load_data(args.testset, args.testlabels)	# converts testing byte data and labels to RDDs
-    print('---------------------------Testing data loaded---------------------------------------')
-    # testing: updates data and labels rdds. labels will be updated to (hash, label) and data will be updated to (hash, bigram_dict)
-    test_data, test_labels = ByteFeatures(sc).transform_data(test_data, args.bytestest, test_labels)
-    print('---------------------------Testing data transformed---------------------------------------')
-    train_data, test_data = ByteFeatures(sc).convert_svmlib(sc, args, train_data, train_labels, test_data, test_labels)
+	test_data, test_labels = ByteFeatures(sc).load_data(args.testset, args.testlabels)	# converts testing byte data and labels to RDDs
+	# testing: updates data and labels rdds. labels will be updated to (hash, label) and data will be updated to (hash, bigram_dict)
+	test_data, test_labels = ByteFeatures(sc).transform_data(test_data, args.bytestest, test_labels)
 
-    if args.mlModel is 'rf':
-        print('Random Forest called')
-        random_forest_classification(sc, args, train_data, test_data)
-    elif args.mlModel is 'nbs':
-        print('Naive Bayes called')
-        naive_bayes_mllib(sc, args, train_data, test_data)
-    elif args.mlModel is 'lr':
-        print('Logistic Regression called')
-        logistic_regression_classification(sc, args, train_data, test_data)
-    elif args.mlModel is 'svm':
-        print('svm called')
-        svm_classification(sc, args, train_data, test_data)
+	# Convert the RDDs to dataframes while combining features and labels for model creation
+	train_df = ByteFeatures(sc).convert_to_dataframe(sql_context, train_data, train_labels)
+	test_df = ByteFeatures(sc).convert_to_dataframe(sql_context, test_data, test_labels)
+	# Execute the Naive Bayes algorithm for dataframes
+	SparkDFMl(sc).naive_bayes(train_df, test_df)
 
+	#train_data, test_data = ByteFeatures(sc).convert_svmlib(sc, args, train_data, train_labels, test_data, test_labels)
+
+	if args.mlModel is 'rf':
+		print('Random Forest called')
+		SparkRDDMl(sc).random_forest_classification(sc, args, train_data, test_data)
+	elif args.mlModel is 'nbs':
+		print('Naive Bayes called')
+		SparkRDDMl(sc).naive_bayes_mllib(sc, args, train_data, test_data)
+	elif args.mlModel is 'lr':
+		print('Logistic Regression called')
+		SparkRDDMl(sc).logistic_regression_classification(sc, args, train_data, test_data)
+	elif args.mlModel is 'svm':
+		print('svm called')
+		SparkRDDMl(sc).logistic_regression_classification(sc, args, train_data, test_data)
 parser = argparse.ArgumentParser(description='Team Marianne solution for Malware Classification')
 
 # All args are optional. Default values are set for each argument
@@ -366,7 +448,7 @@ parser.add_argument ("-at", "--asmtest", default="data/sample/TestAsm/",
 parser.add_argument ("-b", "--bytestrain", default="data/sample/TrainBytes/",
     help = "Path to directory that contains bytes documemts of training set")
 
-parser.add_argument ("-z", "--bytestest", default="data/sample/TestBytes/",
+parser.add_argument ("-bt", "--bytestest", default="data/sample/TestBytes/",
     help = "Path to directory that contains bytes documemts of testing set")
 
 parser.add_argument ("-A", "--asmrdd", default="data/sample/asm_rdd.txt",
@@ -378,10 +460,10 @@ parser.add_argument ("-B", "--bytesrdd", default="data/sample/bytes_rdd.txt",
 parser.add_argument ("-C", "--bytesrddTest", default="data/sample/bytes_rdd_test.txt",
     help = "Path to text file in which RDD from bytes file is stored after preprocessing for test")
 
-parser.add_argument ("-o", "--output", default="output.txt",
+parser.add_argument ("-o", "--output", default="data/sample/output.txt",
     help = "Path to the directory where output will be written")
 
-parser.add_argument ("-model", "--mlModel", default="rf",
+parser.add_argument ("-model", "--mlModel", default="svm",
     help = "Specifies which ML model is to be used")
 
 args = parser.parse_args()
