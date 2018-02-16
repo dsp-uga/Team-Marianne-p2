@@ -66,7 +66,7 @@ class SparkDFMl:
         predictions.show()
 
         evaluator = MulticlassClassificationEvaluator(labelCol='label', predictionCol='prediction', metricName='accuracy')
-        accuracy = evaluator.evaluate(prediction)
+        accuracy = evaluator.evaluate(predictions)
         print('Accuracy is---' + str(accuracy))
 
 class ByteFeatures:
@@ -236,7 +236,7 @@ class ByteFeatures:
             name = splits[-1][:20]
             return name
         byte_files = ByteFeatures(self.sc).extract_data_in_rdd (data.values(), byte_files_path)
-        byte_files = byte_files.map(lambda x: (stripFileNames(x[0]), x[1]))
+        #byte_files = byte_files.map(lambda x: (stripFileNames(x[0]), x[1]))
 
         def tokenEachDoc(aDoc):
             '''
@@ -257,14 +257,14 @@ class ByteFeatures:
                     #del sumGramDict[keys]
                     retDec[keys] = sumGramDict[keys]
             return retDec
-        #data = byte_files.map(lambda x: (x[0], tokenEachDoc(x[1]))) # (hash, bigrams_dict)
+        data = byte_files.map(lambda x: (stripFileNames(x[0]), tokenEachDoc(x[1]))) # (hash, bigrams_dict)
         def convert_to_feature(doc):
             '''Convert the byte file to feature
             '''
             tmpWordList = [x for x in re.sub('\\\\r\\\\n', ' ', doc).split() if len(x) == 2 and x != '??' and x!='00']
             s= ''.join(str(f)+' ' for f in tmpWordList)
             return s
-        data = byte_files.mapValues(lambda x: convert_to_feature(x)) # (hash, bigrams_dict)
+        #data = byte_files.mapValues(lambda x: convert_to_feature(x)) # (hash, bigrams_dict)
 
         def convertHexToInt(hexStr):
             '''
@@ -401,12 +401,12 @@ def main(args):
 	test_data, test_labels = ByteFeatures(sc).transform_data(test_data, args.bytestest, test_labels)
 
 	# Convert the RDDs to dataframes while combining features and labels for model creation
-	train_df = ByteFeatures(sc).convert_to_dataframe(sql_context, train_data, train_labels)
-	test_df = ByteFeatures(sc).convert_to_dataframe(sql_context, test_data, test_labels)
+	#train_df = ByteFeatures(sc).convert_to_dataframe(sql_context, train_data, train_labels)
+	#test_df = ByteFeatures(sc).convert_to_dataframe(sql_context, test_data, test_labels)
 	# Execute the Naive Bayes algorithm for dataframes
-	SparkDFMl(sc).naive_bayes(train_df, test_df)
+	#SparkDFMl(sc).naive_bayes(train_df, test_df)
 
-	#train_data, test_data = ByteFeatures(sc).convert_svmlib(sc, args, train_data, train_labels, test_data, test_labels)
+	train_data, test_data = ByteFeatures(sc).convert_svmlib(sc, args, train_data, train_labels, test_data, test_labels)
 
 	if args.mlModel is 'rf':
 		print('Random Forest called')
@@ -463,7 +463,7 @@ parser.add_argument ("-C", "--bytesrddTest", default="data/sample/bytes_rdd_test
 parser.add_argument ("-o", "--output", default="data/sample/output.txt",
     help = "Path to the directory where output will be written")
 
-parser.add_argument ("-model", "--mlModel", default="svm",
+parser.add_argument ("-model", "--mlModel", default="rf",
     help = "Specifies which ML model is to be used")
 
 args = parser.parse_args()
