@@ -136,6 +136,8 @@ class ByteFeatures:
             '''
             Str = re.sub("\)\, \(", " ", Str)
             Str = re.sub("\, ", ":", Str)
+            Str = re.sub("\: ", "", Str)
+            Str = re.sub(" \:", "", Str)
             Str = re.sub("\)\]", "", Str)
             Str = re.sub("\[\(", "", Str)
             s = re.sub("\(\'","",Str)
