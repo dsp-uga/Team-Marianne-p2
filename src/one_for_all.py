@@ -110,10 +110,10 @@ class ByteFeatures:
             for i in range(nnz):
                 if len(items[1 + i].split(":")) is 2:
                     index, value = items[1 + i].split(":")
+                    indices[i] = int(index) - 1
+                    values[i] = float(value)
                 else:
                     print('error is --- ', items[1 + i])
-                indices[i] = int(index) - 1
-                values[i] = float(value)
             return label, indices, values
     	parsed = lines.map(lambda l: _parse_libsvm_line(l))
     	if numFeatures <= 0:
