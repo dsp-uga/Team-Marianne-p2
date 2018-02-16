@@ -54,7 +54,7 @@ class SparkDFMl:
         #tf.show()
         #rescaled_data.show()
         #tfidf = tf.join(rescaled_data, ['id', 'label']).select('id', 'label', (tf.rawFeatures*rescaled_data.features_idf).alias('feature'))
-        return ret_df
+        return ret_df_f
 
     def naive_bayes(sc, train_df, test_df):
         '''This is implementation of Naive Bayes Algorithm using dataframes
@@ -334,8 +334,8 @@ class SparkRDDMl:
                                          impurity='gini', maxDepth=4, maxBins=32)
     	predictions = model.predict(test_data.map(lambda x: x.features))
     	if(args.evaluate):
-    		score(predictions,test_data, model, args.mlModel)
-    	write_output(predictions, args.output)
+    		SparkRDDMl(sc).score(predictions,test_data, model, args.mlModel)
+    	SparkRDDMl(sc).write_output(predictions, args.output)
 
     def naive_bayes_mllib(self, sc, args, train_data, test_data):
     	'''This does the Naive Bayes Classification for given train and test set
@@ -367,7 +367,7 @@ class SparkRDDMl:
     		score(predictions,test_data, model, args.mlModel)
     	write_output(predictions, args.output)
 
-    def write_output(predictions, path):
+    def write_output(self, predictions, path):
     	'''Write the output to file given in the args output path
     	'''
     	resTrain = predictions.collect()
@@ -377,7 +377,7 @@ class SparkRDDMl:
     	f.close()
     	return path
 
-    def score(predictions,test_data, model, mlModel):
+    def score(self, predictions,test_data, model, mlModel):
     	'''Prints out the accuracy accuracy
     	'''
     	print('score called')
