@@ -247,6 +247,7 @@ def random_forest_classification(sc, args, train_data, test_data):
                                      numTrees=9, featureSubsetStrategy="auto",\
                                      impurity='gini', maxDepth=4, maxBins=32)
     predictions = model.predict(test_data.map(lambda x: x.features))
+    predictions.saveAsTextFile('output.txt')
     predictions_f = predictions.collect()
     print('---------------------printing output----------------------------------')
     for i in range(len(predictions_f)):
