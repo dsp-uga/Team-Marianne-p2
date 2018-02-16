@@ -175,13 +175,13 @@ class ByteFeatures:
                 file = open(byte_files_path+'/'+a+'.bytes', 'rb')
                 byte_file = file.read().decode('utf-8')
             return byte_file #(hash, byte file)
-        byte_files = data.map(lambda x:(x[1], extract_data(byte_files_path,x[1]))) #(hashid, byte_file)
+        #byte_files = data.map(lambda x:(x[1], extract_data(byte_files_path,x[1]))) #(hashid, byte_file)
         def stripFileNames(stringOfName):
             splits = stringOfName.split("/")
             name = splits[-1][:20]
             return name
-        #byte_files = ByteFeatures(self.sc).extract_data_in_rdd (data.values(), byte_files_path)
-        #byte_files = byte_files.map(lambda x: stripFileNames(x[0]))
+        byte_files = ByteFeatures(self.sc).extract_data_in_rdd (data.values(), byte_files_path)
+        byte_files = byte_files.map(lambda x: (stripFileNames(x[0]), x[1]))
 
         def tokenEachDoc(aDoc):
             '''
