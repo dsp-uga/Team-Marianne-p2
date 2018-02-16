@@ -11,11 +11,40 @@ spark-submit main.py <args>
 ```
 If this repo is cloned as it it, sample data is available in /data directory. If given no arguments for training and testing data path, default path will be used which is in /data directory.
 
-In <args> -model argument indicates which Machine Algorithm will be executed. 
-  - rf for Random Forest
-  - nbs for Naive Bayes (MLLIB version)
-  - lr for Logistic Regression
-  - svm for Support Vector Machine (SVM)
+Complete list of args:
+ - "-d", "--dataset" for Path to text file containing hash of documents in training set
+ 
+ - "-l", "--labels" for Path to text file containing labels of documents in training set
+ 
+ - "-t", "--testset" for Path to text file containing hash of documents in testing set
+
+ - "-e", "--evaluate" for Set this to evaluate accuracy on the test set
+
+ - "m", "--testlabels" for Path to text file containing labels of documents in testing set. If evaluate is set true, this file is compared with classifier output
+
+ - "-a", "--asmtrain" for Path to directory that contains asm documemts of training set
+
+ - "-at", "--asmtest" for Path to directory that contains asm documemts of testing set
+
+ - "-b", "--bytestrain" for Path to directory that contains bytes documemts of training set
+
+ - "-bt", "--bytestest" for Path to directory that contains bytes documemts of testing set
+
+ - "-A", "--asmrdd" for Path to text file in which RDD from asm file is stored after preprocessing
+
+ - "-B", "--bytesrdd" for Path to text file in which RDD from bytes file is stored after preprocessing
+
+ - "-C", "--bytesrddTest" for Path to text file in which RDD from bytes file is stored after preprocessing for test
+
+ - "-o", "--output" for Path to the directory where output will be written
+
+ - "-model", "--mlModel" for Specify which ML model is to be used
+
+The options for `-model` argument that indicates which ML Algorithm will be executed are as follows 
+  - "rf" for Random Forest
+  - "nbs" for Naive Bayes (MLLIB version)
+  - "lr" for Logistic Regression
+  - "svm" for Support Vector Machine (SVM)
 
 ## Internal Details
 
