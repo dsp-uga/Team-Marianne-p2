@@ -12,6 +12,7 @@ import itertools
 from collections import Counter
 from pyspark.mllib.util import MLUtils
 from pyspark.mllib.linalg import Vectors, SparseVector, _convert_to_vector
+from pyspark.sql.types import StructType, StructField, StringType
 
 class ByteFeatures:
     '''
@@ -60,6 +61,16 @@ class ByteFeatures:
     		parsed.cache()
     		numFeatures = parsed.map(lambda x: -1 if x[1].size == 0 else x[1][-1]).reduce(max) + 1
     	return parsed.map(lambda x: LabeledPoint(x[0], Vectors.sparse(numFeatures, x[1], x[2])))
+
+    def convert_to_dataframe(self, sql_context, data, labels):
+        data_rdd = data.join(labels) \
+        .map(lambda x: (x[0], x[1][0], x[1][1])) # (hashid, feature, label)
+        # Creating id, feature, label schema
+        schema = StructType([StructField('id', StringType(), True),\
+        StructField('feature', StringType(), True),\
+        StructField('label', StringType(), True)])
+        data = sql_context.createDataFrame(data_rdd, schema)
+        return data
 
     def convert_svmlib(self, sc, args, train_data, train_labels, test_data, test_labels):
         '''This prepares and converts the training and testing data to svmlib format
@@ -137,12 +148,20 @@ class ByteFeatures:
         f.close()
         return path
 
+    def extract_data_in_rdd(self, hashIds, byte_files_path):
+        def make_urls(hash_id):
+            return byte_files_path+'/'+hash_id+'.bytes'
+        hashURLs = hashIds.map(lambda x:make_urls(x))
+        hashURLs = hashURLs.reduce(lambda x, y: x+','+y)
+        print('hashURLs are -----', hashURLs)
+        return self.sc.wholeTextFiles(hashURLs)
+
     def transform_data(self, data, byte_files_path, labels=None):
         '''Loads the actual data, Extracts features out of it and maps labels with file names i.e. hash
         '''
         if labels is not None:
             labels = data.join(labels) # (id, (hash, label))
-            labels = labels.map(lambda x: (x[1][0], x[1][1])) # (hashm label)
+            labels = labels.map(lambda x: (x[1][0], x[1][1])) # (hashid, label)
         else:
             labels = data.map(lambda x: (x[1], '1'))
 
@@ -156,7 +175,13 @@ class ByteFeatures:
                 file = open(byte_files_path+'/'+a+'.bytes', 'rb')
                 byte_file = file.read().decode('utf-8')
             return byte_file #(hash, byte file)
-        byte_files = data.map(lambda x:(x[1], extract_data(byte_files_path,x[1]))) #(hash, byte_file)
+        #byte_files = data.map(lambda x:(x[1], extract_data(byte_files_path,x[1]))) #(hashid, byte_file)
+        def stripFileNames(stringOfName):
+            splits = stringOfName.split("/")
+            name = splits[-1][:20]
+            return name
+        byte_files = ByteFeatures(self.sc).extract_data_in_rdd (data.values(), byte_files_path)
+        byte_files = byte_files.map(lambda x: (stripFileNames(x[0]), x[1]))
 
         def tokenEachDoc(aDoc):
             '''
@@ -177,7 +202,14 @@ class ByteFeatures:
                     #del sumGramDict[keys]
                     retDec[keys] = sumGramDict[keys]
             return retDec
-        data = byte_files.map(lambda x: (x[0], tokenEachDoc(x[1]))) # (hash, bigrams_dict)
+        #data = byte_files.map(lambda x: (x[0], tokenEachDoc(x[1]))) # (hash, bigrams_dict)
+        def convert_to_feature(doc):
+            '''Convert the byte file to feature
+            '''
+            tmpWordList = [x for x in re.sub('\\\\r\\\\n', ' ', doc).split() if len(x) == 2 and x != '??' and x!='00']
+            s= ''.join(str(f)+' ' for f in tmpWordList)
+            return s
+        data = byte_files.mapValues(lambda x: convert_to_feature(x)) # (hash, bigrams_dict)
 
         def convertHexToInt(hexStr):
             '''
@@ -193,5 +225,5 @@ class ByteFeatures:
             for oldKey, value in textDict.items():
                 tmp[convertHexToInt(oldKey)] = value
             return tmp
-        data = data.map(lambda x: (x[0], convertDict(x[1]))) # (hash, bigrams_dict)-- bigram_dict's key is integer now
+        #data = data.map(lambda x: (x[0], convertDict(x[1]))) # (hash, bigrams_dict)-- bigram_dict's key is integer now
         return data, labels
