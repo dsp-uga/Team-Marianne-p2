@@ -67,7 +67,7 @@ class SparkDFMl:
         nb = NaiveBayes(smoothing=1.0, modelType='multinomial')
         nb_model = nb.fit(train_data)
         predictions = nb_model.transform(test_data)
-        predictions.show()
+        predictions.select('prediction').show(truncate = False)
 
         evaluator = MulticlassClassificationEvaluator(labelCol='label', predictionCol='prediction', metricName='accuracy')
         accuracy = evaluator.evaluate(predictions)
@@ -483,7 +483,7 @@ parser.add_argument ("-C", "--bytesrddTest", default="data/sample/bytes_rdd_test
 parser.add_argument ("-o", "--output", default="data/sample/output.txt",
     help = "Path to the directory where output will be written")
 
-parser.add_argument ("-model", "--mlModel", default="rf",
+parser.add_argument ("-model", "--mlModel", default="xyz",
     help = "Specifies which ML model is to be used")
 
 args = parser.parse_args()
