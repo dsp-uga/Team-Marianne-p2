@@ -24,23 +24,26 @@ def main(args):
 	# testing: updates data and labels rdds. labels will be updated to (hash, label) and data will be updated to (hash, bigram_dict)
 	test_data, test_labels = ByteFeatures(sc).transform_data(test_data, args.bytestest, test_labels)
 
-	# Convert the RDDs to dataframes while combining features and labels for model creation
-	train_df = ByteFeatures(sc).convert_to_dataframe(sql_context, train_data, train_labels)
-	test_df = ByteFeatures(sc).convert_to_dataframe(sql_context, test_data, test_labels)
-	# Execute the Naive Bayes algorithm for dataframes
-	SparkDFMl(sc).naive_bayes(train_df, test_df)
-
-	#train_data, test_data = ByteFeatures(sc).convert_svmlib(sc, args, train_data, train_labels, test_data, test_labels)
-
 	if args.mlModel is 'rf':
 		print('Random Forest called')
+		train_data, test_data = ByteFeatures(sc).convert_svmlib(sc, args, train_data, train_labels, test_data, test_labels)
 		SparkRDDMl(sc).random_forest_classification(sc, args, train_data, test_data)
 	elif args.mlModel is 'nbs':
 		print('Naive Bayes called')
+		train_data, test_data = ByteFeatures(sc).convert_svmlib(sc, args, train_data, train_labels, test_data, test_labels)
 		SparkRDDMl(sc).naive_bayes_mllib(sc, args, train_data, test_data)
 	elif args.mlModel is 'lr':
 		print('Logistic Regression called')
+		train_data, test_data = ByteFeatures(sc).convert_svmlib(sc, args, train_data, train_labels, test_data, test_labels)
 		SparkRDDMl(sc).logistic_regression_classification(sc, args, train_data, test_data)
 	elif args.mlModel is 'svm':
 		print('svm called')
+		train_data, test_data = ByteFeatures(sc).convert_svmlib(sc, args, train_data, train_labels, test_data, test_labels)
 		SparkRDDMl(sc).logistic_regression_classification(sc, args, train_data, test_data)
+	elif args.mlModel is 'nbs_df':
+		print('Naive Bayes (Dataframe based implementation) called')
+		# Convert the RDDs to dataframes while combining features and labels for model creation
+		train_df = ByteFeatures(sc).convert_to_dataframe(sql_context, train_data, train_labels)
+		test_df = ByteFeatures(sc).convert_to_dataframe(sql_context, test_data, test_labels)
+		# Execute the Naive Bayes algorithm for dataframes
+		SparkDFMl(sc).naive_bayes(train_df, test_df)

@@ -9,16 +9,17 @@ class SparkRDDMl:
         self.sc = sc
 
     def random_forest_classification(self, sc, args, train_data, test_data):
-    	'''This does the Random forest classification for given train and test set
-    	'''
-    	# Create model and make prediction
-    	model = RandomForest.trainClassifier(train_data, numClasses=9, categoricalFeaturesInfo={},\
-                                         numTrees=9, featureSubsetStrategy="auto",\
+        '''This does the Random forest classification for given train and test set
+        '''
+        # Create model and make prediction
+        model = RandomForest.trainClassifier(train_data.values(), numClasses=9, categoricalFeaturesInfo={},\
+                                         numTrees=100, featureSubsetStrategy="auto",\
                                          impurity='gini', maxDepth=4, maxBins=32)
-    	predictions = model.predict(test_data.map(lambda x: x.features))
-    	if(args.evaluate):
-    		score(predictions,test_data, model, args.mlModel)
-    	write_output(predictions, args.output)
+        test_data.mapValues(lambda x: model.predict(x.features))
+    	#predictions = model.predict(test_data.values().map(lambda x: x.features))
+        if(args.evaluate):
+            score(predictions,test_data, model, args.mlModel)
+        write_output(predictions, args.output)
 
     def naive_bayes_mllib(self, sc, args, train_data, test_data):
     	'''This does the Naive Bayes Classification for given train and test set

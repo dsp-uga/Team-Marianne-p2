@@ -93,15 +93,15 @@ class ByteFeatures:
             return s
         #Convert train data to svmlib file format
         train_data = train_data.join(train_labels)\
-    	     .map(lambda x: (x[1][1], sorted(x[1][0].items(), key = lambda d:d[0])))\
-             .mapValues(lambda x: convertToSVMFormat(str(x)))\
-    		 .map(lambda x:(x[0], x[0]+' '+x[1]))
+    	     .mapValues(lambda x: (x[1][1], sorted(x[1][0].items(), key = lambda d:d[0])))\
+             .mapValues(lambda x: convertToSVMFormat(str(x[1])))\
+    		 .map(lambda x:(x[0],( x[1][0], x[1][0]+' '+x[1][1])))
         train_data = ByteFeatures(sc).loadLibSVMFile(sc, train_data.values())
     	# Convert test data to svmlib format
         test_data = test_data.join(test_labels)\
-    	     .map(lambda x: (x[1][1], sorted(x[1][0].items(), key = lambda d:d[0])))\
-             .mapValues(lambda x: convertToSVMFormat(str(x)))\
-    		 .map(lambda x: (x[0], x[0]+' '+x[1]))
+    	     .mapValues(lambda x: (x[1][1], sorted(x[1][0].items(), key = lambda d:d[0])))\
+             .mapValues(lambda x: convertToSVMFormat(str(x[1])))\
+    		 .map(lambda x: (x[0],(x[1][0], x[1][0]+' '+x[1][1])))
         test_data = ByteFeatures(sc).loadLibSVMFile(sc, test_data.values())
         return train_data, test_data
 
@@ -149,6 +149,8 @@ class ByteFeatures:
         return path
 
     def extract_data_in_rdd(self, hashIds, byte_files_path):
+        '''This method extracts the google stotrage based files in single rdd (Much more efficient)
+        '''
         def make_urls(hash_id):
             return byte_files_path+'/'+hash_id+'.bytes'
         hashURLs = hashIds.map(lambda x:make_urls(x))
