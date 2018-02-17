@@ -45,6 +45,7 @@ The options for `-model` argument that indicates which ML Algorithm will be exec
   - "nbs" for Naive Bayes (MLLIB version)
   - "lr" for Logistic Regression
   - "svm" for Support Vector Machine (SVM)
+  - "nbs_df" for Naive Bayes based on Dataframes
 
 ## Internal Details
 
@@ -53,6 +54,17 @@ Very simple pipe line for this project can be described as below:
 2. byte file is tokenized and tf (term frequency) of the bigram is used as feature
 3. This RDD is then converted to svmlib file format where source method of MLUTILS was implemented in the project to allow faster     processing of RDDs (Refer to [#1])
 4. After converting the data to svmlib format, it is inputted to any of the Machine learning model specified in `<args>` (Refer to [2]).
+
+Another Dataframe based implementation also has very simple pipeline:
+1. Byte file names are stored as keys and extracted byte file is stored as individual value in RDD
+2. byte file is tokenized and tfidf value is extracted from the bigrams features
+3. Naive bayes algorithm is then applied on the tfidf features to predict the labels
+
+Dataframe based implementation currently supports only Naive Bayes algorithm but easily, other models (supported by spark MLLIB) can be added as the data preparation module is already completed
+
+## Results
+
+We got nearly average of 80 % accuracy on small dataset by implementing all the implementations of ML models but we majorly struggled with running the model on large dataset. The reason might be that the code is not scaling up.
 
 ## References
 [1] https://spark.apache.org/docs/1.6.3/api/python/_modules/pyspark/mllib/util.html 
