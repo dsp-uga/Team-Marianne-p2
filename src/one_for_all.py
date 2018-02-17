@@ -214,7 +214,6 @@ class ByteFeatures:
             return byte_files_path+'/'+hash_id+'.bytes'
         hashURLs = hashIds.map(lambda x:make_urls(x))
         hashURLs = hashURLs.reduce(lambda x, y: x+','+y)
-        print('hashURLs are -----', hashURLs)
         return self.sc.wholeTextFiles(hashURLs)
 
     def transform_data(self, data, byte_files_path, labels=None):
@@ -335,7 +334,7 @@ class SparkRDDMl:
         '''
         # Create model and make prediction
         model = RandomForest.trainClassifier(train_data, numClasses=9, categoricalFeaturesInfo={},\
-                                            numTrees=9, featureSubsetStrategy="auto",\
+                                            numTrees=100, featureSubsetStrategy="auto",\
                                          impurity='gini', maxDepth=4, maxBins=32)
         predictions = model.predict(test_data.map(lambda x: x.features))
         print('prediction is done')
@@ -349,14 +348,20 @@ class SparkRDDMl:
         SparkRDDMl(sc).write_output(predictions, args.output)
 
     def naive_bayes_mllib(self, sc, args, train_data, test_data):
-    	'''This does the Naive Bayes Classification for given train and test set
-    	'''
-    	# Create model and make predictions
-    	model = NaiveBayes.train(train_data, 1.0)
-    	predictions = model.predict(test_data.map(lambda x: x.features))
-    	if(args.evaluate):
-    		score(predictions,test_data, model, args.mlModel)
-    	write_output(predictions, args.output)
+        '''This does the Naive Bayes Classification for given train and test set
+        '''
+        # Create model and make predictions
+        model = NaiveBayes.fit(train_data, 1.0)
+        predictions = model.predict(test_data.map(lambda x: x.features))
+        print('prediction is done')
+        resTrain = predictions.collect()
+        print('==============================================================')
+        for i in range(len(resTrain)):
+            print(str(int(resTrain[i]+1)))
+        print('==============================================================')
+        if(args.evaluate):
+            score(predictions,test_data, model, args.mlModel)
+        write_output(predictions, args.output)
 
     def logistic_regression_classification(self, sc, args, train_data, test_data):
     	'''This does the logistic regression classification for given train and test set
