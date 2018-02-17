@@ -26,13 +26,14 @@ class SparkDFMl:
         string_indexer = StringIndexer(inputCol='label', outputCol='label_numeric')
         rescaled_data_numeric = string_indexer.fit(rescaled_data).transform(rescaled_data)
         ret_df = rescaled_data_numeric.selectExpr('id as id', 'label_numeric as label', 'features as features')
+        ret_df_f = ret_df.select(id, (label-1), features)
         #print('tf columns are-- ',tf.columns)
         #print('rescaled_data columns are-- ',rescaled_data.columns)
         #print('Joined columns are-- ',tf.join(rescaled_data, ['id']).columns)
         #tf.show()
         #rescaled_data.show()
         #tfidf = tf.join(rescaled_data, ['id', 'label']).select('id', 'label', (tf.rawFeatures*rescaled_data.features_idf).alias('feature'))
-        return ret_df
+        return ret_df_f
 
     def naive_bayes(sc, train_df, test_df):
         '''This is implementation of Naive Bayes Algorithm using dataframes
@@ -45,5 +46,5 @@ class SparkDFMl:
         predictions.show()
 
         evaluator = MulticlassClassificationEvaluator(labelCol='label', predictionCol='prediction', metricName='accuracy')
-        accuracy = evaluator.evaluate(prediction)
+        accuracy = evaluator.evaluate(predictions)
         print('Accuracy is---' + str(accuracy))
