@@ -32,7 +32,7 @@ class SparkDFMl:
         rescaled_data_numeric = string_indexer.fit(tfidf).transform(rescaled_data)
         # renaming the label column
         ret_df = rescaled_data_numeric.selectExpr('id as id', 'label_numeric as label', 'features as features')
-        return tf
+        return ret_df
 
     def naive_bayes(sc, train_df, test_df):
         '''This is implementation of Naive Bayes Algorithm using dataframes

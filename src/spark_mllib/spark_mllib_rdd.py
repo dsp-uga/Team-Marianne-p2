@@ -16,7 +16,7 @@ class SparkRDDMl:
                                          numTrees=100, featureSubsetStrategy="auto",\
                                          impurity='gini', maxDepth=4, maxBins=32)
         test_data.mapValues(lambda x: model.predict(x.features))
-    	#predictions = model.predict(test_data.values().map(lambda x: x.features))
+    	predictions = model.predict(test_data.values().map(lambda x: x.features))
         if(args.evaluate):
             score(predictions,test_data, model, args.mlModel)
         write_output(predictions, args.output)
