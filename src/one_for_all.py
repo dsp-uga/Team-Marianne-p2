@@ -30,31 +30,34 @@ class SparkDFMl:
         self.sc = sc
 
     def featurize_data(sc, data):
+        '''This method converts the raw bigram features into tfidf vectors
+        '''
         # Tokenize the strings
         tokenizer = Tokenizer(inputCol='feature', outputCol='feature_tokens')
         tokenized_train_df = tokenizer.transform(data)
-        #tokenized_train_df.show()
         # Extract bigrams out of strings
         ngram = NGram(n=2, inputCol='feature_tokens', outputCol='ngrams')
         bigram_train_df = ngram.transform(tokenized_train_df)
         # Converting to hashing features
-        hashing_tf = HashingTF(inputCol='ngrams', outputCol='rawFeatures')
+
+        hashing_tf = HashingTF(inputCol='ngrams', outputCol='features')
         tf = hashing_tf.transform(bigram_train_df)
-        # Converting to counts to TFIDF
-        idf = IDF(inputCol='rawFeatures', outputCol='features')
-        idf_model = idf.fit(tf)
-        rescaled_data = idf_model.transform(tf)
+        tf.show()
         string_indexer = StringIndexer(inputCol='label', outputCol='label_numeric')
-        rescaled_data_numeric = string_indexer.fit(rescaled_data).transform(rescaled_data)
+        rescaled_data_numeric = string_indexer.fit(tf).transform(tf)
         ret_df = rescaled_data_numeric.selectExpr('id as id', 'label_numeric as label', 'features as features')
-        ret_df_f = ret_df.select(id, (label-1), features)
-        #print('tf columns are-- ',tf.columns)
-        #print('rescaled_data columns are-- ',rescaled_data.columns)
-        #print('Joined columns are-- ',tf.join(rescaled_data, ['id']).columns)
-        #tf.show()
-        #rescaled_data.show()
+        # Converting to counts to IDF
+        #idf = IDF(inputCol='rawFeatures', outputCol='features')
+        #df_model = idf.fit(tf)
+        #rescaled_data = idf_model.transform(tf)
+        # multiplying tf and idf scores
         #tfidf = tf.join(rescaled_data, ['id', 'label']).select('id', 'label', (tf.rawFeatures*rescaled_data.features_idf).alias('feature'))
-        return ret_df_f
+        # Converting label (which was StringValue ) to Numeric value
+        #string_indexer = StringIndexer(inputCol='label', outputCol='label_numeric')
+        #rescaled_data_numeric = string_indexer.fit(tfidf).transform(rescaled_data)
+        # renaming the label column
+        #ret_df = rescaled_data_numeric.selectExpr('id as id', 'label_numeric as label', 'features as features')
+        return ret_df
 
     def naive_bayes(sc, train_df, test_df):
         '''This is implementation of Naive Bayes Algorithm using dataframes
@@ -418,12 +421,12 @@ def main(args):
 	test_data, test_labels = ByteFeatures(sc).transform_data(test_data, args.bytestest, test_labels)
 
 	# Convert the RDDs to dataframes while combining features and labels for model creation
-	#train_df = ByteFeatures(sc).convert_to_dataframe(sql_context, train_data, train_labels)
-	#test_df = ByteFeatures(sc).convert_to_dataframe(sql_context, test_data, test_labels)
+	train_df = ByteFeatures(sc).convert_to_dataframe(sql_context, train_data, train_labels)
+	test_df = ByteFeatures(sc).convert_to_dataframe(sql_context, test_data, test_labels)
 	# Execute the Naive Bayes algorithm for dataframes
-	#SparkDFMl(sc).naive_bayes(train_df, test_df)
+	SparkDFMl(sc).naive_bayes(train_df, test_df)
 
-	train_data, test_data = ByteFeatures(sc).convert_svmlib(sc, args, train_data, train_labels, test_data, test_labels)
+	#train_data, test_data = ByteFeatures(sc).convert_svmlib(sc, args, train_data, train_labels, test_data, test_labels)
 
 	if args.mlModel is 'rf':
 		print('Random Forest called')
